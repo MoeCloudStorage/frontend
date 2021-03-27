@@ -11,6 +11,10 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { toggleSnackbar } from "../../../actions";
 import API from "../../../middleware/Api";
+import FormControlLabel from "@material-ui/core/FormControlLabel";
+import Switch from "@material-ui/core/Switch";
+import Select from "@material-ui/core/Select";
+import MenuItem from "@material-ui/core/MenuItem";
 
 const useStyles = makeStyles((theme) => ({
     root: {
@@ -41,12 +45,19 @@ export default function Aria2() {
         aria2_options: "",
         aria2_interval: "0",
         aria2_call_timeout: "0",
+        aria2_remote_enabled: "0",
+        aria2_remote_id: "0",
     });
+    const [policies, setPolicies] = useState({});
 
     const handleChange = (name) => (event) => {
+        let value = event.target.value;
+        if (event.target.checked !== undefined) {
+            value = event.target.checked ? "1" : "0";
+        }
         setOptions({
             ...options,
-            [name]: event.target.value,
+            [name]: value,
         });
     };
 
@@ -56,6 +67,25 @@ export default function Aria2() {
             dispatch(toggleSnackbar(vertical, horizontal, msg, color)),
         [dispatch]
     );
+
+    useEffect(() => {
+        API.post("/admin/policy/list", {
+            page: 1,
+            page_size: 10000,
+            order_by: "id asc",
+            conditions:  { type: "remote" },
+        })
+            .then((response) => {
+                const res = {};
+                response.data.items.forEach((v) => {
+                    res[v.ID] = v.Name;
+                });
+                setPolicies(res);
+            })
+            .catch((error) => {
+                ToggleSnackbar("top", "right", error.message, "error");
+            });
+    }, []);
 
     useEffect(() => {
         API.post("/admin/setting", {
@@ -163,6 +193,64 @@ export default function Aria2() {
                                 </Typography>
                             </Alert>
                         </div>
+
+                        <div className={classes.form}>
+                            <FormControl fullWidth>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={
+                                                options.aria2_remote_enabled === "1"
+                                            }
+                                            onChange={handleChange(
+                                                "aria2_remote_enabled"
+                                            )}
+                                        />
+                                    }
+                                    label="从机离线下载"
+                                />
+                                <FormHelperText id="component-helper-text">
+                                    启用从机离线下载
+                                </FormHelperText>
+                            </FormControl>
+                        </div>
+
+                        {options.aria2_remote_enabled === "1" && (
+                            <>
+                                <div className={classes.form}>
+                                    <FormControl fullWidth>
+                                        <InputLabel htmlFor="component-helper">
+                                            存储策略
+                                        </InputLabel>
+                                        <Select
+                                            labelId="demo-mutiple-chip-label"
+                                            id="demo-mutiple-chip"
+                                            value={options.aria2_remote_id}
+                                            onChange={handleChange(
+                                                "aria2_remote_id"
+                                            )}
+                                            input={
+                                                <Input id="select-multiple-chip" />
+                                            }
+                                        >
+                                            {Object.keys(policies).map(
+                                                (pid) => (
+                                                    <MenuItem
+                                                        key={pid}
+                                                        value={pid}
+                                                    >
+                                                        {policies[pid]}
+                                                    </MenuItem>
+                                                )
+                                            )}
+                                        </Select>
+                                        <FormHelperText id="component-helper-text">
+                                            离线下载的从机
+                                        </FormHelperText>
+                                    </FormControl>
+                                </div>
+                            </>
+                        )}
 
                         <div className={classes.form}>
                             <FormControl fullWidth>
